@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mi Modelo de Teachable Machine</title>
+    <!-- Cargamos TensorFlow.js y Teachable Machine Library -->
+    <script src="https://jsdelivr.net"></script>
+    <script src="https://jsdelivr.net"></script>
+</head>
+<body>
+    <h1>Clasificador en Tiempo Real</h1>
+    <button type="button" onclick="init()">Iniciar Cámara</button>
+    <div id="webcam-container"></div>
+    <div id="label-container"></div>
+
+    <script type="text/javascript">
+        // REEMPLAZA ESTA URL CON LA DE TU PROPIO MODELO EXPORTADO
+        const URL = "https://teachablemachine.withgoogle.com/models/KMuZhdm1q/";
+
+        let model, webcam, labelContainer, maxPredictions;
+
+        async function init() {
+            const modelURL = URL + "model.json";
+            const metadataURL = URL + "metadata.json";
+
+            // Cargar el modelo y las etiquetas
+            model = await tmImage.load(modelURL, metadataURL);
+            maxPredictions = model.getTotalClasses();
+
+            // Configurar la webcam
+            const flip = true; 
+            webcam = new tmImage.Webcam(400, 400, flip); // ancho, alto, voltear
+            await webcam.setup(); // Solicitar acceso a la cámara
+            await webcam.play();
+            window.requestAnimationFrame(loop);
+
+            // Agregar elementos al DOM
+            document.getElementById("webcam-container").appendChild(webcam.canvas);
+            labelContainer = document.getElementById("label-container");
+            for (let i = 0; i < maxPredictions; i++) {
+                labelContainer.appendChild(document.createElement("div"));
+            }
+        }
+
+        async function loop() {
+            webcam.update(); // Actualizar el frame de la webcam
+            await predict();
+            window.requestAnimationFrame(loop);
+        }
+
+        async function predict() {
+            // Predecir la imagen de la webcam
+            const prediction = await model.predict(webcam.canvas);
+            for (let i = 0; i < maxPredictions; i++) {
+                const classPrediction =
+                    prediction[i].className + ": " + (prediction[i].probability * 100).toFixed(2) + "%";
+                labelContainer.childNodes[i].innerHTML = classPrediction;
+            }
+        }
+    </script>
+</body>
+</html>
