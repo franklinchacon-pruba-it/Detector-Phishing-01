@@ -34,7 +34,7 @@
     <div id="label-container"></div>
 
     <script>
-        const MODEL_URL = "https://teachablemachine.withgoogle.com/models/Q4JX7qTqd/";
+        const MODEL_URL = "https://teachablemachine.withgoogle.com/models/KMuZhdm1q/";
         const fileInput = document.getElementById("file-input");
         const predictButton = document.getElementById("predict-btn");
         const imageContainer = document.getElementById("image-container");
@@ -72,7 +72,7 @@
                 updateButton();
             } catch (error) {
                 console.error("No se pudo cargar el modelo:", error);
-                showError("No se pudo cargar el modelo. Verifica la URL y tu conexión a Internet.");
+                showError("No se pudo cargar el modelo. Revisa la URL del modelo o la conexión a Internet.");
                 updateButton();
             }
         }
