@@ -3,61 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mi Modelo de Teachable Machine</title>
-    <!-- Cargamos TensorFlow.js y Teachable Machine Library -->
-    <script src="https://jsdelivr.net"></script>
-    <script src="https://jsdelivr.net"></script>
+    <title>Clasificador de Documento</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/image.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        #image-container {
+            margin: 20px auto;
+            max-width: 600px;
+        }
+        img {
+            max-width: 100%;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+        }
+        #label-container {
+            margin-top: 20px;
+            font-size: 18px;
+        }
+        input[type="file"], button {
+            margin: 10px;
+            padding: 10px 16px;
+            font-size: 16px;
+            border-radius: 6px;
+            border: 1px solid #ccc;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
 </head>
 <body>
-    <h1>Clasificador en Tiempo Real</h1>
-    <button type="button" onclick="init()">Iniciar Cámara</button>
-    <div id="webcam-container"></div>
+    <h1>Clasificador de Documento</h1>
+
+    <input type="file" id="file-input" accept="image/*" />
+    <button type="button" id="predict-btn">Analizar documento</button>
+
+    <div id="image-container"></div>
     <div id="label-container"></div>
 
     <script type="text/javascript">
-        // REEMPLAZA ESTA URL CON LA DE TU PROPIO MODELO EXPORTADO
         const URL = "https://teachablemachine.withgoogle.com/models/KMuZhdm1q/";
 
-        let model, webcam, labelContainer, maxPredictions;
+        let model, labelContainer, maxPredictions;
 
         async function init() {
             const modelURL = URL + "model.json";
             const metadataURL = URL + "metadata.json";
 
-            // Cargar el modelo y las etiquetas
             model = await tmImage.load(modelURL, metadataURL);
             maxPredictions = model.getTotalClasses();
 
-            // Configurar la webcam
-            const flip = true; 
-            webcam = new tmImage.Webcam(400, 400, flip); // ancho, alto, voltear
-            await webcam.setup(); // Solicitar acceso a la cámara
-            await webcam.play();
-            window.requestAnimationFrame(loop);
-
-            // Agregar elementos al DOM
-            document.getElementById("webcam-container").appendChild(webcam.canvas);
             labelContainer = document.getElementById("label-container");
+            labelContainer.innerHTML = "";
+
             for (let i = 0; i < maxPredictions; i++) {
                 labelContainer.appendChild(document.createElement("div"));
             }
         }
 
-        async function loop() {
-            webcam.update(); // Actualizar el frame de la webcam
-            await predict();
-            window.requestAnimationFrame(loop);
-        }
+        async function predictImage(imgElement) {
+            if (!model) {
+                await init();
+            }
 
-        async function predict() {
-            // Predecir la imagen de la webcam
-            const prediction = await model.predict(webcam.canvas);
+            const prediction = await model.predict(imgElement);
             for (let i = 0; i < maxPredictions; i++) {
                 const classPrediction =
                     prediction[i].className + ": " + (prediction[i].probability * 100).toFixed(2) + "%";
                 labelContainer.childNodes[i].innerHTML = classPrediction;
             }
         }
+
+        document.getElementById("file-input").addEventListener("change", function (event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const img = document.createElement("img");
+            const objectURL = URL.createObjectURL(file);
+            img.src = objectURL;
+            img.onload = () => {
+                document.getElementById("image-container").innerHTML = "";
+                document.getElementById("image-container").appendChild(img);
+                predictImage(img);
+            };
+        });
+
+        document.getElementById("predict-btn").addEventListener("click", function () {
+            const fileInput = document.getElementById("file-input");
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert("Primero selecciona una imagen del documento.");
+                return;
+            }
+
+            const img = document.createElement("img");
+            img.src = URL.createObjectURL(file);
+            img.onload = () => {
+                document.getElementById("image-container").innerHTML = "";
+                document.getElementById("image-container").appendChild(img);
+                predictImage(img);
+            };
+        });
+
+        init();
     </script>
 </body>
 </html>
