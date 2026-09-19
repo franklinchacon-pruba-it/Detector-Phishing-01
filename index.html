@@ -159,32 +159,78 @@
 
       function estado(texto, tipo = "") {
         resultado.textContent = texto;
-        resultado.className = `status ${tipo}`;
+        resultado.className = `status ${tipo}`.trim();
       }
 
       async function cargarModelo() {
         try {
-          modelo = await tmImage.load(URL_MODELO + "model.json", URL_MODELO + "metadata.json");
+          modelo = await tmImage.load(`${URL_MODELO}model.json`, `${URL_MODELO}metadata.json`);
           estado("Modelo cargado. Selecciona una imagen.", "success");
         } catch (error) {
-          estado("No se pudo cargar el modelo: " + error.message, "error");
+          estado(`No se pudo cargar el modelo: ${error.message}`, "error");
         }
       }
 
       function mostrarVistaPrevia(archivo) {
         const url = URL.createObjectURL(archivo);
         preview.innerHTML = `<img src="${url}" alt="Vista previa de la imagen seleccionada">`;
-        preview.querySelector("img").onload = () => URL.revokeObjectURL(url);
+        const imagenPrevia = preview.querySelector("img");
+        imagenPrevia.onload = () => URL.revokeObjectURL(url);
+      }
+
+      function normalizarNombreClase(clase) {
+        return String(clase || "Sin clasificar")
+          .replace(/[_-]+/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
       }
 
       function mostrarResultados(lista) {
-        const ordenadas = [...lista].sort((a, b) => b.probability - a.probability);
+        if (!Array.isArray(lista) || lista.length === 0) {
+          estado("El modelo no devolvió predicciones válidas.", "error");
+          return;
+        }
+
+        const ordenadas = [...lista]
+          .map((item) => ({
+            ...item,
+            probability: Number(item?.probability) || 0
+          }))
+          .filter((item) => Number.isFinite(item.probability) && item.probability > 0)
+          .sort((a, b) => b.probability - a.probability);
+
+        if (ordenadas.length === 0) {
+          estado("No se pudieron obtener probabilidades válidas del modelo.", "error");
+          return;
+        }
+
         const mejor = ordenadas[0];
+        const mejorPorcentaje = Math.min(100, Math.max(0, mejor.probability * 100));
+        const mejorClase = normalizarNombreClase(mejor.className);
+
         predicciones.innerHTML = ordenadas.map((item) => {
-          const porcentaje = (item.probability * 100).toFixed(1);
-          return `<div><div class="prediction-label"><span>${item.className}</span><strong>${porcentaje}%</strong></div><div class="bar"><div class="bar-fill" style="width:${porcentaje}%"></div></div></div>`;
+          const porcentaje = Math.min(100, Math.max(0, item.probability * 100));
+          const nombre = normalizarNombreClase(item.className);
+          return `
+            <div>
+              <div class="prediction-label">
+                <span>${nombre}</span>
+                <strong>${porcentaje.toFixed(1)}%</strong>
+              </div>
+              <div class="bar">
+                <div class="bar-fill" style="width:${porcentaje.toFixed(1)}%"></div>
+              </div>
+            </div>
+          `;
         }).join("");
-        estado(`${mejor.className} — ${(mejor.probability * 100).toFixed(1)}% de confianza`, "success");
+
+        const textoClase = /phishing|fraud|malicios|sospech|danger|risky|unsafe/i.test(mejorClase)
+          ? "Riesgo de phishing detectado"
+          : /safe|legit|benign|normal|authentic|trusted|secure/i.test(mejorClase)
+            ? "Imagen aparentemente segura"
+            : "Predicción principal del modelo";
+
+        estado(`${textoClase}: ${mejorClase} (${mejorPorcentaje.toFixed(1)}% de confianza)`, "success");
       }
 
       async function clasificarImagen(archivo) {
@@ -192,35 +238,55 @@
           estado("Selecciona un archivo de imagen válido.", "error");
           return;
         }
+
         mostrarVistaPrevia(archivo);
-        if (!modelo) await cargarModelo();
+
+        if (!modelo) {
+          await cargarModelo();
+        }
         if (!modelo) return;
 
         const imagen = new Image();
         const url = URL.createObjectURL(archivo);
+
         imagen.onload = async () => {
           try {
             const lienzo = document.getElementById("lienzo");
             const ctx = lienzo.getContext("2d");
             ctx.clearRect(0, 0, 224, 224);
+
             const escala = Math.min(224 / imagen.width, 224 / imagen.height);
             const ancho = imagen.width * escala;
             const alto = imagen.height * escala;
+
             ctx.drawImage(imagen, (224 - ancho) / 2, (224 - alto) / 2, ancho, alto);
+
             predicciones.innerHTML = "";
             estado("Analizando imagen...");
-            mostrarResultados(await modelo.predict(lienzo));
+
+            const resultados = await modelo.predict(lienzo);
+            mostrarResultados(resultados);
           } catch (error) {
-            estado("Error al clasificar la imagen: " + error.message, "error");
+            estado(`Error al clasificar la imagen: ${error.message}`, "error");
           } finally {
             URL.revokeObjectURL(url);
           }
         };
-        imagen.onerror = () => { estado("No se pudo cargar la imagen.", "error"); URL.revokeObjectURL(url); };
+
+        imagen.onerror = () => {
+          estado("No se pudo cargar la imagen.", "error");
+          URL.revokeObjectURL(url);
+        };
+
         imagen.src = url;
       }
 
-      document.getElementById("imagen-entrada").addEventListener("change", (evento) => clasificarImagen(evento.target.files[0]));
+      document.getElementById("imagen-entrada").addEventListener("change", (evento) => {
+        const archivo = evento.target.files[0];
+        clasificarImagen(archivo);
+        evento.target.value = "";
+      });
+
       cargarModelo();
     </script>
   </body>
