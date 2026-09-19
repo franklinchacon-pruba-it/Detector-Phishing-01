@@ -1,37 +1,71 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
 <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
- 
+
 <input type="file" id="imagen-entrada" accept="image/*">
 <canvas id="lienzo" width="224" height="224" style="display:none"></canvas>
-<div id="resultado"></div>
- 
+<div id="resultado">Selecciona una imagen para clasificar</div>
+
 <script>
   const URL_MODELO = "https://teachablemachine.withgoogle.com/models/Q4JX7qTqd/";
-  let modelo;
- 
+  let modelo = null;
+
   async function cargarModelo() {
-    modelo = await tmImage.load(URL_MODELO + "model.json", URL_MODELO + "metadata.json");
+    try {
+      modelo = await tmImage.load(URL_MODELO + "model.json", URL_MODELO + "metadata.json");
+      document.getElementById("resultado").innerText = "Modelo cargado. Selecciona una imagen.";
+    } catch (error) {
+      document.getElementById("resultado").innerText = "Error cargando el modelo: " + error.message;
+    }
   }
- 
-  async function clasificarImagen(archivo) {
-    input type="file";
-    imagen.src = URL.createObjectURL(archivo);
-    await imagen.decode();
-    const lienzo = document.getElementById("lienzo");
-    lienzo.getContext("2d").drawImage(imagen, 0, 0, 224, 224);
-    const predicciones = await modelo.predict(lienzo);
-    mostrarResultado(predicciones);
-  }
- 
+
   function mostrarResultado(predicciones) {
     const mejor = predicciones.reduce((a, b) => (a.probability > b.probability ? a : b));
     document.getElementById("resultado").innerText =
       `${mejor.className} — ${(mejor.probability * 100).toFixed(1)}% de confianza`;
   }
- 
-  document.getElementById("imagen-entrada").addEventListener("change", (evento) => {
-    clasificarImagen(evento.target.files[0]);
+
+  async function clasificarImagen(archivo) {
+    if (!archivo) return;
+
+    if (!modelo) {
+      await cargarModelo();
+    }
+
+    if (!modelo) return;
+
+    const imagen = new Image();
+    const url = URL.createObjectURL(archivo);
+
+    imagen.onload = async () => {
+      const lienzo = document.getElementById("lienzo");
+      const ctx = lienzo.getContext("2d");
+
+      ctx.clearRect(0, 0, lienzo.width, lienzo.height);
+      ctx.drawImage(imagen, 0, 0, 224, 224);
+
+      try {
+        const predicciones = await modelo.predict(lienzo);
+        mostrarResultado(predicciones);
+      } catch (error) {
+        document.getElementById("resultado").innerText = "Error al clasificar la imagen: " + error.message;
+      }
+
+      URL.revokeObjectURL(url);
+    };
+
+    imagen.onerror = () => {
+      document.getElementById("resultado").innerText = "No se pudo cargar la imagen.";
+      URL.revokeObjectURL(url);
+    };
+
+    imagen.src = url;
+  }
+
+  document.getElementById("imagen-entrada").addEventListener("change", async (evento) => {
+    const archivo = evento.target.files[0];
+    if (!archivo) return;
+    await clasificarImagen(archivo);
   });
- 
+
   cargarModelo();
 </script>
