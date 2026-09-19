@@ -3,135 +3,611 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
     <title>Detector de phishing</title>
+
+    <!-- TensorFlow.js -->
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+
+    <!-- Teachable Machine -->
     <script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/image.min.js"></script>
+
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background: #f5f5f5; color: #000; }
-        #image-container { margin: 20px auto; max-width: 600px; }
-        img { max-width: 100%; border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); }
-        #label-container { margin-top: 20px; font-size: 18px; line-height: 1.6; color: #000; }
-        #status { margin: 15px 0; color: #000; }
-        input[type="file"], button { margin: 10px; padding: 10px 16px; font-size: 16px; border-radius: 6px; border: 1px solid #ccc; color: #000; }
-        button { background: #007bff; color: #000; border: none; cursor: pointer; }
-        button:disabled { background: #8bbcf0; color: #000; cursor: wait; }
-        .error { color: #000 !important; }
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background: #f5f5f5;
+            color: #000;
+        }
+
+        h1 {
+            margin-bottom: 25px;
+        }
+
+        #image-container {
+            margin: 20px auto;
+            max-width: 600px;
+        }
+
+        #image-container img {
+            max-width: 100%;
+            max-height: 450px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        #label-container {
+            margin-top: 20px;
+            font-size: 18px;
+            line-height: 1.8;
+        }
+
+        #status {
+            margin: 15px 0;
+            font-weight: bold;
+        }
+
+        input[type="file"],
+        button {
+            margin: 10px;
+            padding: 10px 16px;
+            font-size: 16px;
+            border-radius: 6px;
+        }
+
+        input[type="file"] {
+            border: 1px solid #ccc;
+        }
+
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+
+        button:hover:not(:disabled) {
+            background: #0056b3;
+        }
+
+        button:disabled {
+            background: #8bbcf0;
+            cursor: not-allowed;
+        }
+
+        .error {
+            color: red;
+        }
+
+        .resultado {
+            background: white;
+            max-width: 500px;
+            margin: 8px auto;
+            padding: 10px;
+            border-radius: 6px;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+        }
+
+        /* Canvas utilizado para analizar la imagen.
+           No necesita mostrarse al usuario. */
+        #canvas {
+            display: none;
+        }
     </style>
 </head>
+
 <body>
+
     <h1>Detector de phishing</h1>
-    <input type="file" id="file-input" accept="image/*">
-    <button type="button" id="predict-btn" disabled>Analizar documento</button>
+
+    <!-- Seleccionar captura -->
+    <input
+        type="file"
+        id="file-input"
+        accept="image/png, image/jpeg, image/jpg, image/webp"
+    >
+
+    <br>
+
+    <!-- Botón de análisis -->
+    <button
+        type="button"
+        id="predict-btn"
+        disabled
+    >
+        Analizar documento
+    </button>
+
+    <!-- Estado -->
     <p id="status">Cargando modelo...</p>
+
+    <!-- Vista previa -->
     <div id="image-container"></div>
+
+    <!-- Canvas oculto para Teachable Machine -->
+    <canvas
+        id="canvas"
+        width="224"
+        height="224"
+    ></canvas>
+
+    <!-- Resultados -->
     <div id="label-container"></div>
 
+
     <script>
-        const MODEL_URL = "https://teachablemachine.withgoogle.com/models/KMuZhdm1q/";
-        const fileInput = document.getElementById("file-input");
-        const predictButton = document.getElementById("predict-btn");
-        const imageContainer = document.getElementById("image-container");
-        const labelContainer = document.getElementById("label-container");
-        const status = document.getElementById("status");
+
+        /* =========================================================
+           CONFIGURACIÓN DEL MODELO
+        ========================================================= */
+
+        const MODEL_URL =
+            "https://teachablemachine.withgoogle.com/models/KMuZhdm1q/";
+
+
+        /* =========================================================
+           ELEMENTOS HTML
+        ========================================================= */
+
+        const fileInput =
+            document.getElementById("file-input");
+
+        const predictButton =
+            document.getElementById("predict-btn");
+
+        const imageContainer =
+            document.getElementById("image-container");
+
+        const labelContainer =
+            document.getElementById("label-container");
+
+        const status =
+            document.getElementById("status");
+
+        const canvas =
+            document.getElementById("canvas");
+
+        const ctx =
+            canvas.getContext("2d");
+
+
+        /* =========================================================
+           VARIABLES
+        ========================================================= */
 
         let model = null;
+
         let selectedImage = null;
+
         let modelReady = false;
 
+        let currentObjectURL = null;
+
+
+        /* =========================================================
+           MOSTRAR ERROR
+        ========================================================= */
+
         function showError(message) {
+
             status.textContent = message;
+
             status.classList.add("error");
         }
 
+
+        /* =========================================================
+           ACTIVAR / DESACTIVAR BOTÓN
+        ========================================================= */
+
         function updateButton() {
-            // El botón solo se habilita cuando existen el modelo y una imagen válida.
-            predictButton.disabled = !(modelReady && selectedImage);
+
+            predictButton.disabled =
+                !(modelReady && selectedImage);
         }
+
+
+        /* =========================================================
+           CARGAR MODELO DE TEACHABLE MACHINE
+        ========================================================= */
 
         async function init() {
+
             if (typeof tmImage === "undefined") {
-                showError("No se pudo cargar la librería de inteligencia artificial. Recarga la página.");
+
+                showError(
+                    "No se pudo cargar la librería de inteligencia artificial."
+                );
+
                 return;
             }
 
+
             try {
-                model = await tmImage.load(`${MODEL_URL}model.json`, `${MODEL_URL}metadata.json`);
+
+                status.textContent =
+                    "Cargando modelo de inteligencia artificial...";
+
+
+                /*
+                    CORRECCIÓN IMPORTANTE
+
+                    Para utilizar ${MODEL_URL}
+                    necesitamos template strings ` `
+                */
+
+                const modelURL =
+                    ${MODEL_URL}model.json;
+
+                const metadataURL =
+                    ${MODEL_URL}metadata.json;
+
+
+                model =
+                    await tmImage.load(
+                        modelURL,
+                        metadataURL
+                    );
+
+
                 modelReady = true;
-                status.textContent = selectedImage
-                    ? "Modelo listo. Pulsa Analizar documento."
-                    : "Modelo listo. Selecciona una imagen.";
+
+
+                status.classList.remove("error");
+
+
+                status.textContent =
+                    selectedImage
+                        ? "Modelo listo. Pulsa Analizar documento."
+                        : "Modelo listo. Selecciona una imagen.";
+
+
                 updateButton();
-            } catch (error) {
-                console.error("No se pudo cargar el modelo:", error);
-                showError("No se pudo cargar el modelo. Verifica la URL o la conexión a Internet.");
+
+
+                console.log(
+                    "Modelo cargado correctamente."
+                );
+
+                console.log(
+                    "Número de clases:",
+                    model.getTotalClasses()
+                );
+
+
+            }
+            catch (error) {
+
+                console.error(
+                    "No se pudo cargar el modelo:",
+                    error
+                );
+
+
+                showError(
+                    "No se pudo cargar el modelo. Verifica la conexión a Internet o la URL del modelo."
+                );
             }
         }
+
+
+
+        /* =========================================================
+           DIBUJAR IMAGEN EN CANVAS
+        ========================================================= */
+
+        function drawImageOnCanvas(image) {
+
+            /*
+                El modelo de Teachable Machine normalmente
+                trabaja con imágenes cuadradas.
+
+                Utilizamos un canvas de 224 x 224.
+            */
+
+            ctx.clearRect(
+                0,
+                0,
+                canvas.width,
+                canvas.height
+            );
+
+
+            /*
+                Dibujamos la imagen completa dentro
+                del canvas.
+            */
+
+            ctx.drawImage(
+                image,
+                0,
+                0,
+                canvas.width,
+                canvas.height
+            );
+        }
+
+
+
+        /* =========================================================
+           ANALIZAR IMAGEN
+        ========================================================= */
 
         async function predictImage() {
-            if (!modelReady || !model || !selectedImage) {
-                showError("Espera a que cargue el modelo y selecciona una imagen.");
+
+            if (
+                !modelReady ||
+                !model ||
+                !selectedImage
+            ) {
+
+                showError(
+                    "Espera a que cargue el modelo y selecciona una imagen."
+                );
+
                 return;
             }
 
+
             predictButton.disabled = true;
+
             status.classList.remove("error");
-            status.textContent = "Analizando imagen...";
+
+            status.textContent =
+                "Analizando imagen...";
+
+
             labelContainer.replaceChildren();
 
+
             try {
-                const prediction = await model.predict(selectedImage);
-                prediction
-                    .sort((a, b) => b.probability - a.probability)
-                    .forEach(result => {
-                        const resultElement = document.createElement("div");
-                        resultElement.textContent = `${result.className}: ${(result.probability * 100).toFixed(2)}%`;
-                        labelContainer.appendChild(resultElement);
-                    });
-                status.textContent = "Análisis completado.";
-            } catch (error) {
-                console.error("Error al analizar la imagen:", error);
-                showError("No se pudo analizar la imagen. Prueba con otra captura.");
-            } finally {
+
+                /*
+                    Paso 1:
+                    dibujar la imagen seleccionada
+                    en el canvas oculto.
+                */
+
+                drawImageOnCanvas(
+                    selectedImage
+                );
+
+
+                /*
+                    Paso 2:
+                    enviar el canvas al modelo.
+                */
+
+                const prediction =
+                    await model.predict(canvas);
+
+
+                /*
+                    Ordenar desde la probabilidad
+                    más alta hasta la más baja.
+                */
+
+                prediction.sort(
+                    (a, b) =>
+                        b.probability -
+                        a.probability
+                );
+
+
+                /*
+                    Mostrar resultados.
+                */
+
+                prediction.forEach(
+                    result => {
+
+                        const resultElement =
+                            document.createElement("div");
+
+
+                        resultElement.className =
+                            "resultado";
+
+
+                        /*
+                            CORRECCIÓN IMPORTANTE:
+                            aquí también necesitamos
+                            template strings.
+                        */
+
+                        resultElement.textContent =
+                            ${result.className}: ${(result.probability * 100).toFixed(2)}%;
+
+
+                        labelContainer.appendChild(
+                            resultElement
+                        );
+                    }
+                );
+
+
+                /*
+                    Obtener la predicción principal.
+                */
+
+                const bestPrediction =
+                    prediction[0];
+
+
+                status.textContent =
+                    Resultado principal: ${bestPrediction.className} (${(bestPrediction.probability * 100).toFixed(2)}%);
+
+            }
+            catch (error) {
+
+                console.error(
+                    "Error al analizar la imagen:",
+                    error
+                );
+
+
+                showError(
+                    "No se pudo analizar la imagen. Prueba con otra captura."
+                );
+            }
+            finally {
+
                 updateButton();
             }
         }
 
-        fileInput.addEventListener("change", event => {
-            const file = event.target.files && event.target.files[0];
-            if (!file) return;
 
-            if (!file.type.startsWith("image/")) {
-                selectedImage = null;
-                updateButton();
-                showError("Selecciona un archivo de imagen válido.");
-                return;
-            }
 
-            status.classList.remove("error");
-            labelContainer.replaceChildren();
-            const image = document.createElement("img");
-            image.alt = "Vista previa del documento";
-            image.onload = () => {
-                if (selectedImage && selectedImage.src.startsWith("blob:")) {
-                    URL.revokeObjectURL(selectedImage.src);
+        /* =========================================================
+           SELECCIONAR IMAGEN
+        ========================================================= */
+
+        fileInput.addEventListener(
+            "change",
+            event => {
+
+                const file =
+                    event.target.files &&
+                    event.target.files[0];
+
+
+                if (!file) {
+
+                    selectedImage = null;
+
+                    updateButton();
+
+                    return;
                 }
-                selectedImage = image;
-                imageContainer.replaceChildren(image);
-                status.textContent = modelReady
-                    ? "Imagen cargada. Pulsa Analizar documento."
-                    : "Imagen cargada. Esperando el modelo...";
-                updateButton();
-            };
-            image.onerror = () => {
-                selectedImage = null;
-                updateButton();
-                showError("No se pudo leer la imagen seleccionada.");
-            };
-            image.src = URL.createObjectURL(file);
-        });
 
-        predictButton.addEventListener("click", predictImage);
+
+                /*
+                    Validar que realmente
+                    sea una imagen.
+                */
+
+                if (
+                    !file.type.startsWith("image/")
+                ) {
+
+                    selectedImage = null;
+
+                    updateButton();
+
+
+                    showError(
+                        "Selecciona un archivo de imagen válido."
+                    );
+
+
+                    return;
+                }
+
+
+                /*
+                    Limpiar resultados anteriores.
+                */
+
+                status.classList.remove("error");
+
+                labelContainer.replaceChildren();
+
+
+                /*
+                    Liberar URL anterior para
+                    evitar consumo de memoria.
+                */
+
+                if (currentObjectURL) {
+
+                    URL.revokeObjectURL(
+                        currentObjectURL
+                    );
+
+                    currentObjectURL = null;
+                }
+
+
+                /*
+                    Crear nueva URL local.
+                */
+
+                currentObjectURL =
+                    URL.createObjectURL(file);
+
+
+                /*
+                    Crear elemento imagen.
+                */
+
+                const image =
+                    document.createElement("img");
+
+
+                image.alt =
+                    "Vista previa del documento";
+
+
+                image.onload = () => {
+
+                    selectedImage = image;
+
+
+                    imageContainer.replaceChildren(
+                        image
+                    );
+
+
+                    status.textContent =
+                        modelReady
+                            ? "Imagen cargada. Pulsa Analizar documento."
+                            : "Imagen cargada. Esperando el modelo...";
+
+
+                    updateButton();
+                };
+
+
+                image.onerror = () => {
+
+                    selectedImage = null;
+
+
+                    updateButton();
+
+
+                    showError(
+                        "No se pudo leer la imagen seleccionada."
+                    );
+                };
+
+
+                image.src =
+                    currentObjectURL;
+            }
+        );
+
+
+
+        /* =========================================================
+           BOTÓN ANALIZAR
+        ========================================================= */
+
+        predictButton.addEventListener(
+            "click",
+            predictImage
+        );
+
+
+
+        /* =========================================================
+           INICIAR SISTEMA
+        ========================================================= */
+
         init();
+
     </script>
+
 </body>
 </html>
