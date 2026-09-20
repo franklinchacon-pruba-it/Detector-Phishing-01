@@ -101,6 +101,29 @@
 
       .preview img { display: block; width: 100%; max-height: 300px; object-fit: contain; }
       .result { display: flex; min-height: 100%; flex-direction: column; }
+      .resultado-real {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        padding: 16px 18px;
+        margin-bottom: 14px;
+        border: 1px solid rgba(56, 189, 248, .35);
+        border-radius: 14px;
+        background: rgba(2, 6, 23, .55);
+      }
+      .resultado-real__label {
+        color: var(--muted);
+        font-size: .72rem;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+      }
+      .resultado-real__value {
+        color: var(--primary);
+        font-size: clamp(1.15rem, 2.4vw, 1.6rem);
+        font-weight: 800;
+        line-height: 1.25;
+        word-break: break-word;
+      }
       .status { min-height: 74px; padding: 15px; border: 1px solid var(--border); border-radius: 13px; color: var(--muted); line-height: 1.5; background: rgba(2, 6, 23, .55); }
       .status.success { border-color: rgba(52, 211, 153, .45); color: #bbf7d0; }
       .status.error { border-color: rgba(251, 113, 133, .55); color: #fecdd3; }
@@ -140,6 +163,10 @@
 
         <div class="card result">
           <h2>Resultado del análisis</h2>
+          <div class="resultado-real" aria-live="polite">
+            <span class="resultado-real__label">Resultado real del modelo</span>
+            <strong id="resultado-real" class="resultado-real__value">Esperando imagen...</strong>
+          </div>
           <div id="resultado" class="status">Cargando modelo...</div>
           <div id="predicciones" class="predictions"></div>
           <p class="hint">La predicción es una referencia automática. Comprueba siempre la dirección web y el remitente antes de introducir datos personales.</p>
@@ -156,18 +183,27 @@
       const resultado = document.getElementById("resultado");
       const preview = document.getElementById("preview");
       const predicciones = document.getElementById("predicciones");
+      const resultadoReal = document.getElementById("resultado-real");
 
       function estado(texto, tipo = "") {
         resultado.textContent = texto;
         resultado.className = `status ${tipo}`.trim();
       }
 
+      function mostrarResultadoReal(clase, confianza) {
+        const nombre = normalizarNombreClase(clase);
+        const porcentaje = Math.min(100, Math.max(0, Number(confianza || 0) * 100));
+        resultadoReal.textContent = `${nombre} (${porcentaje.toFixed(1)}%)`;
+      }
+
       async function cargarModelo() {
         try {
           modelo = await tmImage.load(`${URL_MODELO}model.json`, `${URL_MODELO}metadata.json`);
           estado("Modelo cargado. Selecciona una imagen.", "success");
+          resultadoReal.textContent = "Esperando imagen...";
         } catch (error) {
           estado(`No se pudo cargar el modelo: ${error.message}`, "error");
+          resultadoReal.textContent = "Error al cargar el modelo";
         }
       }
 
@@ -188,6 +224,7 @@
       function mostrarResultados(lista) {
         if (!Array.isArray(lista) || lista.length === 0) {
           estado("El modelo no devolvió predicciones válidas.", "error");
+          resultadoReal.textContent = "Sin clasificación";
           return;
         }
 
@@ -201,12 +238,15 @@
 
         if (ordenadas.length === 0) {
           estado("No se pudieron obtener probabilidades válidas del modelo.", "error");
+          resultadoReal.textContent = "Sin clasificación";
           return;
         }
 
         const mejor = ordenadas[0];
         const mejorPorcentaje = Math.min(100, Math.max(0, mejor.probability * 100));
         const mejorClase = normalizarNombreClase(mejor.className);
+
+        mostrarResultadoReal(mejor.className, mejor.probability);
 
         predicciones.innerHTML = ordenadas.map((item) => {
           const porcentaje = Math.min(100, Math.max(0, item.probability * 100));
@@ -236,6 +276,7 @@
       async function clasificarImagen(archivo) {
         if (!archivo || !archivo.type.startsWith("image/")) {
           estado("Selecciona un archivo de imagen válido.", "error");
+          resultadoReal.textContent = "Archivo no válido";
           return;
         }
 
@@ -262,12 +303,14 @@
             ctx.drawImage(imagen, (224 - ancho) / 2, (224 - alto) / 2, ancho, alto);
 
             predicciones.innerHTML = "";
+            resultadoReal.textContent = "Analizando...";
             estado("Analizando imagen...");
 
             const resultados = await modelo.predict(lienzo);
             mostrarResultados(resultados);
           } catch (error) {
             estado(`Error al clasificar la imagen: ${error.message}`, "error");
+            resultadoReal.textContent = "Error de clasificación";
           } finally {
             URL.revokeObjectURL(url);
           }
@@ -275,6 +318,7 @@
 
         imagen.onerror = () => {
           estado("No se pudo cargar la imagen.", "error");
+          resultadoReal.textContent = "No se pudo cargar la imagen";
           URL.revokeObjectURL(url);
         };
 
