@@ -6,16 +6,16 @@
     <title>Detector de Phishing</title>
     <style>
       :root {
-        --bg: #08111f;
-        --panel: rgba(15, 28, 48, 0.86);
-        --panel-light: rgba(30, 47, 75, 0.72);
-        --primary: #38bdf8;
-        --primary-dark: #0284c7;
-        --success: #34d399;
-        --danger: #fb7185;
-        --text: #f8fafc;
-        --muted: #a7b4c8;
-        --border: rgba(148, 163, 184, 0.2);
+        --bg: #f4f7ff;
+        --panel: rgba(255, 255, 255, 0.92);
+        --panel-light: rgba(228, 236, 255, 0.9);
+        --primary: #7c6ae6;
+        --primary-dark: #5b4de6;
+        --success: #34c9b7;
+        --danger: #ff7d7d;
+        --text: #1f2937;
+        --muted: #52677f;
+        --border: rgba(115, 129, 151, 0.2);
       }
 
       * { box-sizing: border-box; }
@@ -29,7 +29,7 @@
         justify-content: center;
         color: var(--text);
         font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        background: radial-gradient(circle at top left, #123b5d 0, transparent 38%), linear-gradient(135deg, #020617, var(--bg));
+        background: radial-gradient(circle at top left, #dfe9ff 0, transparent 38%), linear-gradient(135deg, #eef2ff, var(--bg));
       }
 
       .app { width: min(900px, 100%); }
@@ -38,8 +38,8 @@
         padding: 34px 34px 28px;
         border: 1px solid var(--border);
         border-radius: 26px 26px 0 0;
-        background: linear-gradient(135deg, rgba(14, 116, 144, .34), rgba(15, 23, 42, .9));
-        box-shadow: 0 24px 70px rgba(2, 132, 199, .18);
+        background: linear-gradient(135deg, rgba(147, 197, 253, 0.32), rgba(255, 255, 255, 0.9));
+        box-shadow: 0 24px 70px rgba(124, 106, 230, 0.12);
       }
 
       .eyebrow {
@@ -62,7 +62,7 @@
         border: 1px solid var(--border);
         border-top: 0;
         border-radius: 0 0 26px 26px;
-        background: rgba(15, 23, 42, .82);
+        background: rgba(255, 255, 255, 0.65);
       }
 
       .card { padding: 20px; border: 1px solid var(--border); border-radius: 19px; background: var(--panel); }
@@ -71,15 +71,15 @@
       .dropzone {
         display: block;
         padding: 34px 18px;
-        border: 2px dashed rgba(56, 189, 248, .55);
+        border: 2px dashed rgba(124, 106, 230, 0.5);
         border-radius: 16px;
         text-align: center;
         cursor: pointer;
-        background: rgba(14, 165, 233, .06);
+        background: rgba(124, 106, 230, 0.06);
         transition: .2s ease;
       }
 
-      .dropzone:hover, .dropzone:focus-within { border-color: var(--primary); background: rgba(14, 165, 233, .13); transform: translateY(-2px); }
+      .dropzone:hover, .dropzone:focus-within { border-color: var(--primary); background: rgba(124, 106, 230, 0.11); transform: translateY(-2px); }
       .upload-icon { display: block; margin-bottom: 12px; font-size: 2.25rem; }
       .dropzone strong { display: block; font-size: 1.05rem; }
       .dropzone span { display: block; margin-top: 7px; color: var(--muted); font-size: .9rem; }
@@ -95,7 +95,7 @@
         border: 1px solid var(--border);
         border-radius: 16px;
         color: var(--muted);
-        background: rgba(2, 6, 23, .62);
+        background: rgba(240, 244, 255, 0.9);
         text-align: center;
       }
 
@@ -107,9 +107,9 @@
         gap: 8px;
         padding: 16px 18px;
         margin-bottom: 14px;
-        border: 1px solid rgba(56, 189, 248, .35);
+        border: 1px solid rgba(124, 106, 230, 0.28);
         border-radius: 14px;
-        background: rgba(2, 6, 23, .55);
+        background: rgba(248, 250, 255, 0.96);
       }
       .resultado-real__label {
         color: var(--muted);
@@ -124,13 +124,13 @@
         line-height: 1.25;
         word-break: break-word;
       }
-      .status { min-height: 74px; padding: 15px; border: 1px solid var(--border); border-radius: 13px; color: var(--muted); line-height: 1.5; background: rgba(2, 6, 23, .55); }
-      .status.success { border-color: rgba(52, 211, 153, .45); color: #bbf7d0; }
-      .status.error { border-color: rgba(251, 113, 133, .55); color: #fecdd3; }
+      .status { min-height: 74px; padding: 15px; border: 1px solid var(--border); border-radius: 13px; color: var(--muted); line-height: 1.5; background: rgba(248, 250, 255, 0.96); }
+      .status.success { border-color: rgba(52, 201, 183, .45); color: #0f766e; }
+      .status.error { border-color: rgba(255, 125, 125, .5); color: #b91c1c; }
       .predictions { display: grid; gap: 14px; margin-top: 20px; }
       .prediction-label { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 7px; font-size: .9rem; }
       .prediction-label strong { color: var(--primary); }
-      .bar { height: 9px; overflow: hidden; border-radius: 999px; background: rgba(148, 163, 184, .16); }
+      .bar { height: 9px; overflow: hidden; border-radius: 999px; background: rgba(148, 163, 184, .18); }
       .bar-fill { height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--primary-dark), var(--success)); transition: width .4s ease; }
       .hint { margin: auto 0 0; padding-top: 22px; color: var(--muted); font-size: .82rem; line-height: 1.5; }
 
